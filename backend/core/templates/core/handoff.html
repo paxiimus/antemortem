@@ -1,0 +1,10 @@
+{% extends "core/base.html" %}{% block title %}Ante Mortem — {{ owner.display_name|default:owner.handle }}{% endblock %}
+{% block body %}
+<h1>{{ owner.display_name|default:owner.handle }}</h1>
+<p>{{ contact.name }}, you were named as a trusted contact.</p>
+{% if owner.status == "released" %}<p>Their vault has been released to you.</p>
+{% elif contact.attested_at %}<p>Your attestation is recorded.</p>
+{% else %}<p>If they have died, you can confirm it and unlock your share. Nothing here is decrypted in a browser — it happens in the app, with code you can verify.</p>{% endif %}
+<p><a href="antemortem://c/{{ token }}" style="display:inline-block;padding:.8rem 1.2rem;background:#c9a96e;color:#0b0b0d;text-decoration:none;border-radius:8px;font-weight:600">Open in Ante Mortem</a></p>
+<p><small>Don't have it? <a href="{{ ios_url }}">App Store</a> · <a href="{{ android_url }}">Google Play</a>. Then come back to this link.</small></p>
+{% endblock %}

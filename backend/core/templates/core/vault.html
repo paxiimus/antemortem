@@ -1,0 +1,11 @@
+{% extends "core/base.html" %}{% block body %}<h1>Vault of {{ owner.display_name|default:owner.handle }}</h1>
+<p>Enter the vault passphrase they gave you. Decryption happens in this tab; nothing leaves your device.</p>
+<input id="key" type="password"><button id="go">Unlock</button><div id="out"></div>
+{{ entries_json|json_script:"entries" }}
+<script type="module">
+import { openVault } from "/static/crypto.js";
+const entries = JSON.parse(document.getElementById("entries").textContent);
+go.onclick = async () => { try {
+  out.innerHTML = (await openVault(entries, "{{ salt }}", key.value)).map(e=>`<h3>${e.title}</h3><pre>${e.body}</pre>`).join("");
+} catch { out.textContent = "Wrong passphrase."; } };
+</script>{% endblock %}

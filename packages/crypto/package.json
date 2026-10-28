@@ -1,0 +1,18 @@
+{
+  "name": "@antemortem/crypto",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "test": "node --experimental-strip-types --test test/*.test.ts"
+  },
+  "dependencies": {
+    "libsodium-wrappers-sumo": "^0.7.15",
+    "tlock-js": "^0.9.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.6"
+  },
+  "license": "MIT"
+}

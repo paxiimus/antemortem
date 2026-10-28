@@ -1,0 +1,13 @@
+# Production ingress. Caddy terminates TLS on the box itself — no third party sees plaintext HTTP.
+{$DOMAIN} {
+    encode zstd gzip
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        X-Content-Type-Options nosniff
+        Referrer-Policy strict-origin-when-cross-origin
+        # Cemetery + contact pages: own scripts only. The crypto bundle must be ours.
+        Content-Security-Policy "default-src 'self'; script-src 'none'; style-src 'self' 'unsafe-inline'; img-src 'self' data:"
+        -Server
+    }
+    reverse_proxy backend:8000
+}

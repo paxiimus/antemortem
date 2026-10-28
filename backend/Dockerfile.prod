@@ -1,0 +1,28 @@
+# Build context: repo root (needs packages/crypto for the tlock CLI).
+#   docker build -f backend/Dockerfile.prod --build-arg GIT_SHA=$(git rev-parse HEAD) .
+
+FROM node:22-alpine AS crypto
+WORKDIR /crypto
+COPY packages/crypto/package*.json ./
+RUN npm ci --omit=dev --ignore-scripts && npm i --no-save typescript
+COPY packages/crypto/ ./
+RUN npx tsc && npm prune --omit=dev
+
+FROM python:3.12-slim
+ARG GIT_SHA=dev
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 APP_VERSION=${GIT_SHA}
+RUN apt-get update && apt-get install -y --no-install-recommends curl nodejs \
+ && rm -rf /var/lib/apt/lists/* && useradd -r -u 1001 app
+WORKDIR /app
+COPY backend/requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+COPY --from=crypto /crypto/dist /app/crypto/dist
+COPY --from=crypto /crypto/node_modules /app/crypto/node_modules
+COPY --from=crypto /crypto/package.json /app/crypto/
+COPY backend/ .
+RUN chmod +x entrypoint.sh && DJANGO_SECRET_KEY=build DEBUG=1 python manage.py collectstatic --noinput
+USER app
+EXPOSE 8000
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s \
+  CMD curl -sf http://localhost:8000/api/health/live/ || exit 1
+CMD ["/app/entrypoint.sh", "gunicorn", "antemortem.wsgi:application", "-b", "0.0.0.0:8000", "-w", "2", "--access-logfile", "-"]

@@ -1,0 +1,7 @@
+{% extends "core/base.html" %}{% block title %}{{ owner.display_name|default:owner.handle }}{% endblock %}
+{% block head %}{% if note %}<meta property="og:title" content="{{ owner.display_name|default:owner.handle }} — last words"><meta property="og:description" content="{{ note.body_plain|truncatechars:160 }}">{% endif %}{% endblock %}
+{% block body %}<h1>{{ owner.display_name|default:owner.handle }}</h1>
+{% if note %}<p><small>Released {{ note.released_at|date:"j F Y" }}</small></p><blockquote>{{ note.body_plain|linebreaks }}</blockquote>
+<h2>Condolences</h2>{% for c in condolences %}<p>{{ c.body|linebreaks }}<small>— {{ c.author.display_name|default:c.author.handle }}</small></p>{% endfor %}
+{% if user.is_authenticated %}<form method="post" action="{% url 'condole' owner.handle %}">{% csrf_token %}<textarea name="body" maxlength="2000"></textarea><button>Leave condolence</button></form>{% endif %}
+{% else %}<p>Still with us.</p>{% endif %}{% endblock %}

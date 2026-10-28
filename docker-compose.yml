@@ -1,0 +1,28 @@
+# Local dev only. Prod is docker-compose.prod.yml (immutable GHCR image, no build:).
+services:
+  db:
+    image: postgres:16-alpine
+    environment: { POSTGRES_DB: antemortem, POSTGRES_USER: antemortem, POSTGRES_PASSWORD: antemortem }
+    ports: ["5432:5432"]
+  redis:
+    image: redis:7-alpine
+  api:
+    build: { context: ., dockerfile: backend/Dockerfile.prod }
+    command: /app/entrypoint.sh python manage.py runserver 0.0.0.0:8000
+    environment: &env
+      DEBUG: "1"
+      DB_NAME: antemortem
+      DB_USER: antemortem
+      DB_PASSWORD: antemortem
+      DB_HOST: db
+      CELERY_BROKER_URL: redis://redis:6379/0
+      ANTEMORTEM_AUTO_MIGRATE: "1"
+    volumes: [./backend:/app]
+    ports: ["8000:8000"]
+    depends_on: [db, redis]
+  worker:
+    build: { context: ., dockerfile: backend/Dockerfile.prod }
+    command: celery -A antemortem worker -B -l info
+    environment: *env
+    volumes: [./backend:/app]
+    depends_on: [db, redis]

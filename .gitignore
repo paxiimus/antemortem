@@ -1,0 +1,15 @@
+.env
+.deploy.env
+.hetzner.env
+secrets/
+backups/
+__pycache__/
+*.sqlite3
+staticfiles/
+node_modules/
+dist/
+.expo/
+*.pem
+*.key
+*.age
+.DS_Store

@@ -1,0 +1,24 @@
+{
+  "name": "antemortem-app",
+  "main": "expo-router/entry",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "setup": "bash ../scripts/setup-mobile.sh",
+    "start": "expo start",
+    "ios": "expo run:ios",
+    "android": "expo run:android",
+    "doctor": "npx expo-doctor && npx expo install --check",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@antemortem/core": "file:../packages/core",
+    "buffer": "^6.0.3",
+    "jotai": "^2.10.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0",
+    "@types/react": "~18.3.12"
+  },
+  "license": "MIT"
+}

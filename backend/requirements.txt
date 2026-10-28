@@ -1,0 +1,11 @@
+Django>=5.1,<5.3
+djangorestframework>=3.15
+django-environ>=0.11
+django-cors-headers>=4.4
+whitenoise>=6.7
+psycopg[binary]>=3.2
+celery[redis]>=5.4
+redis>=5
+gunicorn>=22
+postmarker>=1.0
+pynacl>=1.5

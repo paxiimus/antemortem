@@ -1,0 +1,2 @@
+{% extends "core/base.html" %}{% block body %}<h1>Cemetery</h1>
+{% for n in notes %}<p><a href="/cemetery/{{ n.owner.handle }}">{{ n.owner.display_name|default:n.owner.handle }}</a> <small>{{ n.released_at|date:"Y" }}</small></p>{% empty %}<p>Nobody yet.</p>{% endfor %}{% endblock %}

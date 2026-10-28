@@ -1,0 +1,15 @@
+{% extends "core/base.html" %}{% block body %}
+<h1>{{ owner.display_name|default:owner.handle }}</h1>
+{% if owner.status == "released" %}<p>Already released. <a href="/vault/{{ contact.access_token }}">Open the vault.</a></p>
+{% elif contact.attested_at %}<p>Your attestation is recorded. Release opens after a cooling-off period unless they log in.</p>
+{% else %}<p>You were named as a trusted contact. Only continue if they have died.</p>
+<form method="post" id="attest">{% csrf_token %}
+<label>Share passphrase (given to you by them)<input name="pass" type="password"></label>
+<input type="hidden" name="share"><button>I confirm they have died</button></form>
+<script type="module">
+// Decrypt the Shamir share client-side and submit the plain share. See packages/crypto.
+import { unwrapShare } from "/static/crypto.js";
+document.getElementById("attest").onsubmit = async e => { e.preventDefault();
+  e.target.share.value = await unwrapShare("{{ share_ct }}", "{{ share_nonce }}", e.target.pass.value);
+  e.target.submit(); };
+</script>{% endif %}{% endblock %}

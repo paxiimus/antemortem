@@ -1,0 +1,48 @@
+{
+  "expo": {
+    "name": "Ante Mortem",
+    "slug": "antemortem",
+    "scheme": "antemortem",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": true,
+    "ios": {
+      "bundleIdentifier": "com.paxiimus.antemortem",
+      "supportsTablet": false,
+      "associatedDomains": [
+        "applinks:antemortem.example"
+      ]
+    },
+    "android": {
+      "package": "com.paxiimus.antemortem",
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "antemortem.example",
+              "pathPrefix": "/c"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        }
+      ]
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "apiUrl": "http://localhost:8000"
+    }
+  }
+}
