@@ -1,7 +1,7 @@
 {
   "cli": { "version": ">= 12.0.0" },
   "build": {
-    "preview": { "distribution": "internal", "env": { "EXPO_PUBLIC_API_URL": "https://api.antemortem.example" } },
-    "production": { "env": { "EXPO_PUBLIC_API_URL": "https://api.antemortem.example" } }
+    "preview": { "distribution": "internal", "env": { "EXPO_PUBLIC_API_URL": "https://api.antemortem.fyi" } },
+    "production": { "env": { "EXPO_PUBLIC_API_URL": "https://api.antemortem.fyi" } }
   }
 }

@@ -67,7 +67,11 @@ case "${1:-help}" in
     F="${2:-}"; [ -f "$F" ] || { err "usage: restore <backup.sql.gz>"; ls -lh backups/*.sql.gz 2>/dev/null | tail; exit 1; }
     warn "DESTRUCTIVE: replaces the DB with $F"; read -rp "Type 'yes': " C; [ "$C" = yes ] || exit 1
     $COMPOSE stop backend celery celery-beat
-    gunzip -c "$F" | $COMPOSE exec -T db psql -U "$DB_USER" -d "$DB_NAME"
+    info "Safety backup: $(dump pre-restore)"
+    $COMPOSE exec -T db psql -U "$DB_USER" -d postgres -v ON_ERROR_STOP=1 \
+      -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname='$DB_NAME' AND pid<>pg_backend_pid();" \
+      -c "DROP DATABASE IF EXISTS \"$DB_NAME\";" -c "CREATE DATABASE \"$DB_NAME\" OWNER \"$DB_USER\";"
+    gunzip -c "$F" | $COMPOSE exec -T db psql -U "$DB_USER" -d "$DB_NAME" -v ON_ERROR_STOP=1
     $COMPOSE start backend celery celery-beat; sleep 8; info "health HTTP $(health)" ;;
 
   run)

@@ -5,7 +5,7 @@
         Strict-Transport-Security "max-age=31536000; includeSubDomains"
         X-Content-Type-Options nosniff
         Referrer-Policy strict-origin-when-cross-origin
-        # Cemetery + contact pages: own scripts only. The crypto bundle must be ours.
+        # Server pages carry no JavaScript at all; keys only ever touch the mobile app.
         Content-Security-Policy "default-src 'self'; script-src 'none'; style-src 'self' 'unsafe-inline'; img-src 'self' data:"
         -Server
     }

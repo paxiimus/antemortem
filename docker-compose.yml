@@ -17,12 +17,12 @@ services:
       DB_HOST: db
       CELERY_BROKER_URL: redis://redis:6379/0
       ANTEMORTEM_AUTO_MIGRATE: "1"
-    volumes: [./backend:/app]
+    volumes: [./backend:/app, /app/crypto]   # /app/crypto keeps the image's tlock CLI under the bind mount
     ports: ["8000:8000"]
     depends_on: [db, redis]
   worker:
     build: { context: ., dockerfile: backend/Dockerfile.prod }
     command: celery -A antemortem worker -B -l info
     environment: *env
-    volumes: [./backend:/app]
+    volumes: [./backend:/app, /app/crypto]
     depends_on: [db, redis]

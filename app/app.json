@@ -11,7 +11,7 @@
       "bundleIdentifier": "com.paxiimus.antemortem",
       "supportsTablet": false,
       "associatedDomains": [
-        "applinks:antemortem.example"
+        "applinks:api.antemortem.fyi"
       ]
     },
     "android": {
@@ -23,7 +23,7 @@
           "data": [
             {
               "scheme": "https",
-              "host": "antemortem.example",
+              "host": "api.antemortem.fyi",
               "pathPrefix": "/c"
             }
           ],

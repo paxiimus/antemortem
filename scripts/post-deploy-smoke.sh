@@ -1,5 +1,5 @@
 #!/bin/bash
-# Black-box smoke against a running Ante Mortem. Usage: ./post-deploy-smoke.sh https://api.antemortem.example
+# Black-box smoke against a running Ante Mortem. Usage: ./post-deploy-smoke.sh https://api.antemortem.fyi
 set -u
 BASE="${1:-http://localhost:8000}"; fail=0
 chk() { local want="$1" path="$2"; got=$(curl -s -o /dev/null -w "%{http_code}" "$BASE$path");

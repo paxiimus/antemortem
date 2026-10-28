@@ -3,8 +3,8 @@
 # image tagged by commit SHA. deploy.sh exports DEPLOY_TAG and pulls it.
 # No `build:` and no host-mounted code — the image is the runtime, full stop.
 # Ingress is Caddy on the box: direct origin, Let's Encrypt, TLS terminated here.
-# No CDN or tunnel in the path — a TLS-terminating intermediary could rewrite the
-# crypto bundle served to contacts, which is the one thing E2E-in-browser can't survive.
+# No CDN or tunnel in the path — a TLS-terminating intermediary would see every request
+# in plaintext, and the point of the project is that no third party does.
 #
 # Required .env: GHCR_OWNER DB_NAME DB_USER DB_PASSWORD DJANGO_SECRET_KEY (see .env.production.example)
 
