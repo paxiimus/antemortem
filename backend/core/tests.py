@@ -40,7 +40,7 @@ class ShamirTest(TestCase):
 
 class SwitchTest(TestCase):
     def test_overdue_lapses_and_nags(self):
-        u = make_user(last_checkin=timezone.now() - timedelta(days=91))
+        u = make_user(last_checkin=timezone.now() - timedelta(days=90, hours=1))   # due 1h ago -> overdue day 0
         with mock.patch("core.tasks.mail.send") as send:
             sweep()
         u.refresh_from_db()

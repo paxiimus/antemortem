@@ -11,7 +11,7 @@ APP_URL = env("APP_URL", default="http://localhost:8000")   # public cemetery / 
 APP_VERSION = env("APP_VERSION", default="dev")
 CSRF_TRUSTED_ORIGINS = env.list("CSRF_TRUSTED_ORIGINS", default=[])
 CORS_ALLOWED_ORIGINS = env.list("CORS_ALLOWED_ORIGINS", default=[])
-if not DEBUG and not CORS_ALLOWED_ORIGINS:
+if env("ANTEMORTEM_ENV", default="") == "production" and not CORS_ALLOWED_ORIGINS:
     raise RuntimeError("CORS_ALLOWED_ORIGINS must be set in production")
 
 INSTALLED_APPS = [

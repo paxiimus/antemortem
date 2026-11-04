@@ -13,3 +13,4 @@ dist/
 *.key
 *.age
 .DS_Store
+.venv/

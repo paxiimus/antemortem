@@ -30,7 +30,7 @@ dev:  ## Local stack (Postgres, Redis, Django w/ auto-migrate, worker+beat)
 	docker compose up
 
 test:  ## Backend tests + crypto tests (incl. TS↔Python Shamir cross-check)
-	cd backend && python manage.py test
+	cd backend && DEBUG=1 python manage.py test
 	cd packages/crypto && npm test
 
 setup-mobile:  ## Expo at latest SDK with compatible packages (UPGRADE=1 bumps SDK)
