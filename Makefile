@@ -33,8 +33,22 @@ test:  ## Backend tests + crypto tests (incl. TS↔Python Shamir cross-check)
 	cd backend && DEBUG=1 python manage.py test
 	cd packages/crypto && npm test
 
-setup-mobile:  ## Expo at latest SDK with compatible packages (UPGRADE=1 bumps SDK)
+
+# ── Mobile ───────────────────────────────────────────────────────────
+# A phone can't reach "localhost", so dev builds point at this machine's LAN address.
+LAN_IP     := $(shell (hostname -I 2>/dev/null || ipconfig getifaddr en0 2>/dev/null) | awk '{print $$1}')
+MOBILE_API ?= http://$(LAN_IP):8000
+
+setup-mobile:  ## Install/realign the Expo app (UPGRADE=1 moves to the newest SDK)
 	./scripts/setup-mobile.sh $(if $(UPGRADE),--upgrade,)
+mobile:  ## Metro for an installed dev build, API on this machine (MOBILE_API= to override)
+	cd app && EXPO_PUBLIC_API_URL=$(MOBILE_API) npx expo start --dev-client
+android: check-jdk  ## Build + install the dev build on a USB device or emulator
+	cd app && EXPO_PUBLIC_API_URL=$(MOBILE_API) npx expo run:android
+android-clean: check-jdk  ## Same, after regenerating app/android from app.json
+	cd app && npx expo prebuild --clean --platform android && EXPO_PUBLIC_API_URL=$(MOBILE_API) npx expo run:android
+apk: check-jdk  ## Installable preview APK built locally (prod API, no EAS minutes)
+	cd app && eas build --platform android --profile preview --local
 
 # ── Deploy ───────────────────────────────────────────────────────────
 push-backend:  ## Build + push image (NO_CACHE=1 to bypass layer cache)
@@ -46,7 +60,7 @@ deploy-backend: check-config check-clean push-backend  ## Build → push → box
 	$(call ops,deploy main-$(SHA))
 	@$(MAKE) -s health
 
-deploy-mobile:  ## EAS Android preview (PLATFORM=ios for iOS; burns EAS minutes)
+deploy-mobile:  ## EAS cloud preview build (PLATFORM=ios for iOS; burns EAS minutes)
 	cd app && eas build --platform $(or $(PLATFORM),android) --profile preview
 
 # ── Operate ──────────────────────────────────────────────────────────
@@ -111,3 +125,7 @@ check-clean:
 	@[ "$(FORCE)" = "1" ] && exit 0; \
 	 [ -z "$$(git status --porcelain)" ] || { git status -s; echo "dirty tree (FORCE=1 to bypass)"; exit 1; }; \
 	 [ -z "$$(git log @{u}..HEAD 2>/dev/null)" ] || git push
+check-jdk:
+	@J="$${JAVA_HOME:+$$JAVA_HOME/bin/}javac"; $$J -version 2>&1 | grep -q '^javac 17\.' || { \
+	  echo "Android builds need JDK 17; found: $$($$J -version 2>&1 | grep "^javac" || echo none)"; \
+	  echo "  sudo apt install openjdk-17-jdk && export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64"; exit 1; }

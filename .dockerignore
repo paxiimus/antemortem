@@ -1,0 +1,12 @@
+# Build context is the repo root, but the backend image only needs backend/ and packages/crypto/.
+*
+!backend
+!packages/crypto
+**/node_modules
+**/.venv
+**/__pycache__
+**/*.pyc
+**/*.sqlite3
+**/staticfiles
+**/dist
+**/.env*

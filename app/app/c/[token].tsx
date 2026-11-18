@@ -1,7 +1,7 @@
 // Contact flow. Reached via antemortem://c/<token> or https://<domain>/c/<token>. No account needed.
 import { useEffect, useState } from "react";
 import { useLocalSearchParams } from "expo-router";
-import { attestDeath, fetchContactView, openContactVault, ready, type ContactView } from "@antemortem/core";
+import { ApiError, attestDeath, fetchContactView, openContactVault, ready, type ContactView } from "@antemortem/core";
 import { Button, Card, Err, H, Input, P, Screen } from "@/ui";
 
 export default function Contact() {
@@ -18,7 +18,7 @@ export default function Contact() {
   const attest = async () => {
     setErr(null);
     try { await attestDeath(token, view, pass); setPass(""); await load(); }
-    catch { setErr("That share passphrase doesn't match."); }
+    catch (e) { setErr(e instanceof ApiError ? `The server refused that (${e.status}). Try again later.` : "That share passphrase doesn't match."); }
   };
   const open = () => { setErr(null); try { setEntries(openContactVault(view, pass)); } catch { setErr("Wrong vault passphrase."); } };
 

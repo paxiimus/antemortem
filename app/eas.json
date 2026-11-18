@@ -1,7 +1,28 @@
 {
-  "cli": { "version": ">= 12.0.0" },
+  "cli": {
+    "version": ">= 12.0.0"
+  },
   "build": {
-    "preview": { "distribution": "internal", "env": { "EXPO_PUBLIC_API_URL": "https://api.antemortem.fyi" } },
-    "production": { "env": { "EXPO_PUBLIC_API_URL": "https://api.antemortem.fyi" } }
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      }
+    },
+    "preview": {
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://api.antemortem.fyi"
+      },
+      "android": {
+        "buildType": "apk"
+      }
+    },
+    "production": {
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://api.antemortem.fyi"
+      }
+    }
   }
 }

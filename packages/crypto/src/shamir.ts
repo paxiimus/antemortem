@@ -13,7 +13,7 @@ const div = (a: number, b: number) => { if (!b) throw new Error("div0"); return 
 
 const defaultRng = (n: number) => globalThis.crypto.getRandomValues(new Uint8Array(n));
 
-export function split(secret: Uint8Array, n: number, k: number, rng = defaultRng): Uint8Array[] {
+export function split(secret: Uint8Array, n: number, k: number, rng: (n: number) => Uint8Array = defaultRng): Uint8Array[] {
   if (!(k > 1 && k <= n && n <= 255)) throw new Error("need 1 < k <= n <= 255");
   const coeffs: Uint8Array[] = [];
   for (const s of secret) { const c = new Uint8Array(k); c[0] = s; c.set(rng(k - 1), 1); coeffs.push(c); }

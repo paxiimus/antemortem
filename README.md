@@ -13,6 +13,7 @@ backend/           Django + DRF + Celery. Stores ciphertext, runs the switch, re
 app/               Expo (iOS + Android) — Expo Router + Jotai. The only client that touches keys.
 packages/core/     App logic: API client, atoms, owner flows (seal/unlock/re-seal), contact flows (attest/open vault).
 packages/crypto/   Shared TS: Argon2id, XChaCha20-Poly1305, Shamir (GF(2^8)), drand tlock.
+site/              Static landing page (one HTML file, no build step).
 docker-compose.yml      Local dev stack.
 docker-compose.prod.yml Caddy (TLS on the box), GHCR image, Celery, Postgres, Redis.
 scripts/                deploy.sh (server), server-bootstrap.sh, provision-hetzner.sh, smoke.

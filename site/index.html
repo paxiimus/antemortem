@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ante Mortem</title>
+<meta name="description" content="Last words, sealed until you're gone. An encrypted vault and a public note that is published after you stop checking in.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Instrument+Serif:ital@0;1&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&display=swap" rel="stylesheet">
+<style>
+/* Plan: a probate document. Cool paper, ink, one ember-red seal. Left-aligned, ruled, mono for anything cryptographic.
+   Boldness lives in the hero: the sealed note that unseals when you go silent. Everything else stays quiet. */
+:root {
+  --paper: #e8eaed;
+  --card: #f5f6f8;
+  --ink: #15171c;
+  --mute: #565c67;
+  --line: #c4c9d1;
+  --ember: #c23d16;
+  --ember-ink: #ffffff;
+  --display: "Instrument Serif", "Iowan Old Style", Georgia, serif;
+  --body: "Newsreader", "Iowan Old Style", Georgia, serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0e1014; --card: #161920; --ink: #e9e7e2; --mute: #9aa0ab; --line: #2b303a;
+    --ember: #ff7c48; --ember-ink: #1a0d06; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #0e1014; --card: #161920; --ink: #e9e7e2; --mute: #9aa0ab; --line: #2b303a;
+  --ember: #ff7c48; --ember-ink: #1a0d06; color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; background: var(--paper); color: var(--ink); font: 400 18px/1.6 var(--body); }
+a { color: inherit; text-decoration-color: var(--ember); text-underline-offset: 3px; text-decoration-thickness: 1px; }
+a:hover { color: var(--ember); }
+:focus-visible { outline: 2px solid var(--ember); outline-offset: 3px; }
+.wrap { max-width: 1080px; margin: 0 auto; padding: 0 20px; }
+.mono { font-family: var(--mono); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--mute); }
+
+/* nav */
+nav { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; padding: 22px 0; border-bottom: 1px solid var(--line); }
+.mark { font: 400 1.5rem/1 var(--display); letter-spacing: .01em; text-decoration: none; }
+.mark i { color: var(--ember); }
+nav .links { display: flex; gap: 20px; flex-wrap: wrap; }
+nav a.mono { text-decoration: none; }
+
+/* hero */
+.hero { display: grid; grid-template-columns: minmax(0, 1.02fr) minmax(0, .98fr); gap: 48px; padding: 56px 0 64px; align-items: start; }
+.def { margin: 0 0 20px; }
+.def b { color: var(--ink); font-weight: 500; }
+h1 { font: 400 clamp(2.7rem, 6.4vw, 4.8rem)/1 var(--display); letter-spacing: -.01em; margin: 0 0 24px; text-wrap: balance; }
+h1 em { color: var(--ember); }
+.lede { font-size: 1.15rem; max-width: 34em; margin: 0 0 24px; }
+.pills { display: flex; flex-wrap: wrap; gap: 8px; }
+.pill { font: 500 12px/1 var(--mono); letter-spacing: .06em; text-transform: uppercase; border: 1px solid var(--line); padding: 8px 10px; border-radius: 2px; color: var(--mute); }
+.pill.hot { border-color: var(--ember); color: var(--ember); }
+
+/* the seal */
+.seal { background: var(--card); border: 1px solid var(--line); border-radius: 3px; }
+.seal-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--line); }
+.state { font: 500 12px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; padding: 6px 9px; border: 1px solid currentColor; color: var(--mute); border-radius: 2px; }
+.seal[data-open="true"] .state { background: var(--ember); border-color: var(--ember); color: var(--ember-ink); }
+.note { padding: 20px 16px; min-height: 9.2rem; font: 400 15px/1.55 var(--mono); word-break: break-all; color: var(--mute); }
+.seal[data-open="true"] .note { font: 400 1.22rem/1.5 var(--body); word-break: normal; color: var(--ink); }
+.ctl { padding: 16px; border-top: 1px solid var(--line); display: grid; gap: 14px; }
+.readout { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.readout b { font: 500 13px/1.4 var(--mono); letter-spacing: .04em; color: var(--ink); }
+.stage { margin: 0; min-height: 3.3em; font-size: 1rem; }
+input[type=range] { width: 100%; accent-color: var(--ember); margin: 0; height: 28px; }
+.ticks { position: relative; height: 34px; margin-top: -6px; font: 400 11px/1 var(--mono); color: var(--mute); }
+.ticks span { position: absolute; transform: translateX(-50%); padding-top: 12px; }
+.ticks span::before { content: ""; position: absolute; top: 0; left: 50%; height: 8px; border-left: 1px solid var(--mute); }
+.ticks span.pub { color: var(--ember); }
+.ticks span.pub::before { border-color: var(--ember); }
+.btns { display: flex; flex-wrap: wrap; gap: 10px; }
+button { font: 500 13px/1 var(--mono); letter-spacing: .06em; text-transform: uppercase; padding: 12px 14px; border-radius: 2px; cursor: pointer; border: 1px solid var(--ink); background: transparent; color: var(--ink); }
+button:hover { background: var(--ink); color: var(--paper); }
+button.go { background: var(--ember); border-color: var(--ember); color: var(--ember-ink); }
+button.go:hover { filter: brightness(1.08); background: var(--ember); color: var(--ember-ink); }
+.flash { min-height: 1.5em; margin: 0; font: 400 13px/1.5 var(--mono); color: var(--ember); }
+.key { margin: 0; font-size: .88rem; color: var(--mute); }
+
+/* sections */
+section { border-top: 1px solid var(--line); padding: 64px 0; }
+.cols { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 48px; }
+h2 { font: 400 clamp(2rem, 4.4vw, 3rem)/1.05 var(--display); margin: 10px 0 0; text-wrap: balance; }
+.steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; }
+.steps li { display: grid; grid-template-columns: 44px 1fr; gap: 12px; padding: 20px 0; border-bottom: 1px solid var(--line); }
+.steps li:first-child { padding-top: 0; }
+.steps li:last-child { border-bottom: 0; padding-bottom: 0; }
+.steps .n { font: 500 13px/1.7 var(--mono); color: var(--ember); }
+.steps h3 { font: 500 1.05rem/1.3 var(--body); margin: 0 0 4px; }
+.steps p { margin: 0; color: var(--mute); }
+
+.memorial { background: var(--card); border: 1px solid var(--line); border-radius: 3px; }
+.memorial header { padding: 12px 16px; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.memorial .body { padding: 20px 16px; }
+.memorial h3 { font: 400 2rem/1.1 var(--display); margin: 0 0 4px; }
+.memorial blockquote { margin: 18px 0 0; padding: 0 0 0 16px; border-left: 2px solid var(--ember); font-size: 1.1rem; }
+.cond { border-top: 1px solid var(--line); padding: 14px 16px; }
+.cond p { margin: 4px 0 0; }
+.cond + .cond { border-top: 1px dashed var(--line); }
+
+.facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 28px; margin-top: 36px; }
+.fact { border-top: 2px solid var(--ink); padding-top: 14px; }
+.fact h3 { font: 500 1.05rem/1.3 var(--body); margin: 8px 0 6px; }
+.fact p { margin: 0; color: var(--mute); }
+.tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+.tags code { font: 400 12px/1 var(--mono); border: 1px solid var(--line); padding: 5px 7px; border-radius: 2px; color: var(--mute); }
+
+.limits { list-style: none; margin: 28px 0 0; padding: 0; display: grid; gap: 0; max-width: 46em; }
+.limits li { padding: 14px 0 14px 28px; border-top: 1px solid var(--line); position: relative; }
+.limits li::before { content: ""; position: absolute; left: 4px; top: 1.35em; width: 10px; height: 10px; background: var(--ember); border-radius: 50%; }
+.lic { display: flex; flex-wrap: wrap; gap: 28px; margin-top: 24px; }
+.lic div { min-width: 200px; }
+.lic b { display: block; font: 500 1.05rem/1.3 var(--body); }
+
+footer { border-top: 1px solid var(--line); padding: 28px 0 48px; display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; color: var(--mute); font-size: .95rem; }
+
+.mark { white-space: nowrap; }
+@media (max-width: 560px) { nav .links a:nth-child(-n+2) { display: none; } nav .links { gap: 16px; } }
+@media (max-width: 860px) {
+  .hero, .cols { grid-template-columns: minmax(0, 1fr); gap: 36px; }
+  .facts { grid-template-columns: minmax(0, 1fr); }
+  .hero { padding-top: 36px; }
+  section { padding: 48px 0; }
+}
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <nav>
+    <a class="mark" href="#top">Ante Mortem<i>.</i></a>
+    <div class="links">
+      <a class="mono" href="#cemetery">Cemetery</a>
+      <a class="mono" href="#trust">Trust</a>
+      <a class="mono" href="#limits">Limits</a>
+      <a class="mono" href="https://github.com/paxiimus/antemortem">Source</a>
+    </div>
+  </nav>
+
+  <main id="top">
+    <div class="hero">
+      <div>
+        <p class="def mono"><b>ante mortem</b>, adj. Made before death. Published after.</p>
+        <h1>Last words, sealed until you're <em>gone.</em></h1>
+        <p class="lede">Write the note you could never post while you were alive. Ante Mortem keeps it encrypted on your phone. While you keep checking in, nobody can read it, including us. When you stop, it is published to a public cemetery where people can leave condolences.</p>
+        <div class="pills">
+          <span class="pill hot">Pre-alpha</span>
+          <span class="pill">Open source</span>
+          <span class="pill">Unaudited</span>
+          <span class="pill">Not in the stores yet</span>
+        </div>
+      </div>
+
+      <div class="seal" id="seal" data-open="false">
+        <div class="seal-head">
+          <span class="mono">Example note, fictional</span>
+          <span class="state" id="state">Sealed</span>
+        </div>
+        <div class="note" id="note" aria-label="Example note, sealed"></div>
+        <div class="ctl">
+          <div class="readout">
+            <b id="dayOut">Day 0 without a check-in</b>
+            <span class="mono">Check-in interval: 90 days</span>
+          </div>
+          <div>
+            <input type="range" id="days" min="0" max="160" value="0" aria-label="Days without a check-in" aria-describedby="stage">
+            <div class="ticks" aria-hidden="true">
+              <span style="left:56.25%">90</span>
+              <span style="left:75%">120</span>
+              <span class="pub" style="left:86.9%">139</span>
+            </div>
+          </div>
+          <p class="stage" id="stage" aria-live="polite"></p>
+          <div class="btns">
+            <button type="button" class="go" id="silent">Go silent</button>
+            <button type="button" id="still">Still here</button>
+          </div>
+          <p class="flash" id="flash" aria-live="polite"></p>
+          <p class="key">Illustrative. Assumes both contacts confirm on day 125. Day 90 is when a check-in falls due, 120 is when contacts are asked, 139 is the end of the 14-day cooling-off.</p>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <section id="how">
+    <div class="cols">
+      <div>
+        <p class="mono">How it works</p>
+        <h2>Four steps. One of them is a tap.</h2>
+      </div>
+      <ol class="steps">
+        <li><span class="n">01</span><div><h3>Write</h3><p>Your public note and your private vault are encrypted on your phone before they leave it. The server stores ciphertext, your email and some dates.</p></div></li>
+        <li><span class="n">02</span><div><h3>Check in</h3><p>One tap every 30 to 365 days, your choice. Miss it and you get a reminder on the due date, another a week later and a third a week after that.</p></div></li>
+        <li><span class="n">03</span><div><h3>Your people confirm</h3><p>Thirty days past due, your contacts are asked whether anyone has heard from you. All of them must confirm. A 14-day cooling-off follows, and one check-in from you cancels the release.</p></div></li>
+        <li><span class="n">04</span><div><h3>It's published</h3><p>The note appears on a public memorial page and your contacts can open the private vault. A time lock on the drand network also opens the note at a date you keep pushing back, so it comes out even if your contacts never act.</p></div></li>
+      </ol>
+    </div>
+  </section>
+
+  <section id="cemetery">
+    <div class="cols">
+      <div>
+        <p class="mono">The cemetery</p>
+        <h2>A public place for what people left behind.</h2>
+        <p style="margin-top:20px;color:var(--mute)">Every released note gets a memorial page. Anyone can read it and leave a condolence. The page carries no scripts, no tracking and no ads.</p>
+      </div>
+      <div class="memorial" aria-label="Example memorial page, invented">
+        <header><span class="mono">/cemetery/example</span><span class="mono">Example page. All names and words are invented.</span></header>
+        <div class="body">
+          <h3>Mara Example</h3>
+          <span class="mono">Last words</span>
+          <blockquote>Mara, the blue ledger is in the bottom drawer. Pay Tomas back first. I was never angry about the boat. Take the good knife.</blockquote>
+        </div>
+        <div class="cond"><span class="mono">Condolence</span><p>Found the ledger. Paid back.</p></div>
+        <div class="cond"><span class="mono">Condolence</span><p>The boat is fine. So are we.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="trust">
+    <p class="mono">Why you don't have to take our word for it</p>
+    <h2>The server never holds a key.</h2>
+    <div class="facts">
+      <div class="fact"><span class="mono">On your phone</span><h3>Keys stay in the app</h3><p>There is no web client that touches keys. Your vault key comes from your passphrase and never leaves the device.</p>
+        <div class="tags"><code>Argon2id</code><code>XChaCha20-Poly1305</code></div></div>
+      <div class="fact"><span class="mono">Two ways to open</span><h3>Contacts or a time lock</h3><p>The note's key is split between your contacts, and also locked to a future round of the drand randomness beacon. The server holds no share of either.</p>
+        <div class="tags"><code>Shamir k-of-k</code><code>drand tlock</code></div></div>
+      <div class="fact"><span class="mono">What a subpoena gets</span><h3>Ciphertext</h3><p>The database holds encrypted blobs, emails and timestamps. That is all there is to hand over.</p>
+        <div class="tags"><code>no key shares</code><code>no plaintext</code></div></div>
+    </div>
+  </section>
+
+  <section id="limits">
+    <p class="mono">Read this before you trust it</p>
+    <h2>What it can't do.</h2>
+    <ul class="limits">
+      <li>Nobody has audited the code. One person wrote and reviewed it.</li>
+      <li>Lose your vault passphrase and the vault is gone. There is no reset, by design.</li>
+      <li>A note is not a will. It has no legal effect.</li>
+      <li>If you stop checking in by accident, the note can still be published. Tell your contacts, and set an interval longer than your longest holiday.</li>
+      <li>The time lock depends on the drand network staying online.</li>
+    </ul>
+    <div class="lic">
+      <div><b>Server: AGPL-3.0</b><span class="mono">Run it, change it, publish your changes</span></div>
+      <div><b>App and crypto: MIT</b><span class="mono">Reuse and audit freely</span></div>
+      <div><b>Security reports</b><span class="mono">contact@paxiimus.com</span></div>
+    </div>
+  </section>
+
+  <footer>
+    <span>Ante Mortem. Still here.</span>
+    <span>Built in public by Paxiimus. <a href="https://www.youtube.com/@paxiimus">Follow the build</a>.</span>
+  </footer>
+</div>
+
+<script>
+(function () {
+  var MAX = 160, DUE = 90, REMIND = [90, 97, 104], ASK = 120, ATTEST = 125, PUBLISH = 139;
+  var TEXT = "Mara, the blue ledger is in the bottom drawer. Pay Tomas back first. I was never angry about the boat. Take the good knife.";
+  var ALPH = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+  var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var seed = 20260;
+  function rnd() { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; }
+  var CT = Array.prototype.map.call(TEXT, function () { return ALPH[Math.floor(rnd() * ALPH.length)]; }).join("");
+
+  var $ = function (id) { return document.getElementById(id); };
+  var seal = $("seal"), note = $("note"), state = $("state"), range = $("days"), out = $("dayOut"),
+      stage = $("stage"), flash = $("flash"), timer = null, open = false, raf = null;
+
+  function say(msg) { flash.textContent = msg || ""; }
+
+  function describe(d) {
+    if (d < DUE) return "Sealed. Next check-in due in " + (DUE - d) + " day" + (DUE - d === 1 ? "" : "s") + ".";
+    if (d < ASK) {
+      var k = REMIND.filter(function (r) { return d >= r; }).length;
+      return "Overdue. " + k + " of 3 reminders sent to you. One tap on Still here cancels everything.";
+    }
+    if (d < ATTEST) return "Your contacts have been asked whether anyone has heard from you.";
+    if (d < PUBLISH) return "Both contacts confirmed. Cooling-off ends in " + (PUBLISH - d) + " day" + (PUBLISH - d === 1 ? "" : "s") + ". You can still cancel by checking in.";
+    return "Published. The note is public and can't be recalled.";
+  }
+
+  function setOpen(next) {
+    if (next === open) return;
+    open = next;
+    seal.setAttribute("data-open", String(open));
+    state.textContent = open ? "Published" : "Sealed";
+    note.setAttribute("aria-label", open ? "Example note, published" : "Example note, sealed");
+    if (raf) cancelAnimationFrame(raf);
+    if (!open || reduce) { note.textContent = open ? TEXT : CT; return; }
+    var start = performance.now(), dur = 1100;
+    (function frame(now) {
+      var p = Math.min(1, (now - start) / dur), n = Math.floor(p * TEXT.length), s = TEXT.slice(0, n);
+      for (var i = n; i < TEXT.length; i++) s += TEXT[i] === " " ? " " : ALPH[Math.floor(Math.random() * ALPH.length)];
+      note.textContent = s;
+      if (p < 1) raf = requestAnimationFrame(frame);
+    })(start);
+  }
+
+  function render() {
+    var d = +range.value;
+    out.textContent = "Day " + d + " without a check-in";
+    stage.textContent = describe(d);
+    setOpen(d >= PUBLISH);
+  }
+
+  function stop() { if (timer) { clearInterval(timer); timer = null; } }
+
+  range.addEventListener("input", function () { stop(); say(""); render(); });
+
+  $("silent").addEventListener("click", function () {
+    stop(); say("");
+    if (reduce) { range.value = 145; render(); return; }
+    if (+range.value >= PUBLISH) range.value = 0;
+    timer = setInterval(function () {
+      range.value = +range.value + 1; render();
+      if (+range.value >= 145) stop();
+    }, 28);
+  });
+
+  $("still").addEventListener("click", function () {
+    stop();
+    var d = +range.value;
+    if (d >= PUBLISH) { say("Too late. Published notes can't be recalled."); return; }
+    range.value = 0; render();
+    say(d >= ATTEST ? "Check-in received. Release cancelled. The note stays sealed." : "Check-in received. The clock restarts.");
+  });
+
+  note.textContent = CT;
+  render();
+})();
+</script>
+</body>
+</html>

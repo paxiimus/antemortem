@@ -47,6 +47,43 @@ class SwitchTest(TestCase):
         self.assertEqual(u.status, "lapsed")
         self.assertEqual(send.call_count, 1)
 
+    def test_missed_sweeps_catch_up_once(self):
+        u = make_user(last_checkin=timezone.now() - timedelta(days=100))   # 10 days overdue, nothing sent yet
+        with mock.patch("core.tasks.mail.send") as send:
+            sweep(); sweep()
+        self.assertEqual(send.call_count, 1)          # one catch-up reminder, not one per missed day, not repeated
+        u.refresh_from_db()
+        self.assertEqual(u.nags_sent, 2)
+
+    def test_contact_alert_survives_a_missed_day_and_sends_once(self):
+        u = make_user(last_checkin=timezone.now() - timedelta(days=140))   # 50 days overdue, first sweep ever
+        make_note(u, n_contacts=2)
+        with mock.patch("core.tasks.mail.send") as send:
+            sweep(); sweep()
+        self.assertEqual(send.call_count, 1 + 2)      # 1 reminder + 2 contact alerts, once
+        u.refresh_from_db()
+        self.assertIsNotNone(u.contacts_alerted_at)
+
+    def test_mail_failure_is_retried_and_does_not_block_others(self):
+        a = make_user(handle="a", email="a@x.io", last_checkin=timezone.now() - timedelta(days=91))
+        b = make_user(handle="b", email="b@x.io", last_checkin=timezone.now() - timedelta(days=91))
+        with mock.patch("core.tasks.mail.send", side_effect=RuntimeError("postmark down")), \
+                self.assertLogs("core.tasks", "ERROR"):
+            sweep()
+        for u in (a, b):
+            u.refresh_from_db()
+            self.assertEqual((u.status, u.nags_sent), ("lapsed", 0))   # still processed, nothing recorded
+        with mock.patch("core.tasks.mail.send") as send:
+            sweep()
+        self.assertEqual(send.call_count, 2)          # both retried once mail is back
+
+    def test_checkin_resets_notification_state(self):
+        u = make_user(last_checkin=timezone.now() - timedelta(days=140))
+        with mock.patch("core.tasks.mail.send"):
+            sweep()
+        u.refresh_from_db(); u.check_in(); u.refresh_from_db()
+        self.assertEqual((u.nags_sent, u.contacts_alerted_at), (0, None))
+
     def test_checkin_resets_and_vetoes(self):
         u = make_user(status="lapsed")
         release.open_release(u, "attest")

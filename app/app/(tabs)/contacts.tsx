@@ -1,27 +1,47 @@
 import { useState } from "react";
 import { useAtom, useAtomValue } from "jotai";
-import { api } from "@antemortem/core";
+import { api, ApiError } from "@antemortem/core";
 import { contactPassphrase, decryptOwnerCopy, publishNote } from "@antemortem/core";
 import { contactsAtom, userAtom, vaultKeyAtom, type Contact } from "@antemortem/core";
-import { Button, Card, H, Input, P, Screen } from "@/ui";
+import { Button, Card, Err, H, Input, P, Screen } from "@/ui";
+
+const orNull = <T,>(p: Promise<T>) => p.catch(e => { if (e instanceof ApiError && e.status === 404) return null; throw e; });
 
 export default function Contacts() {
   const key = useAtomValue(vaultKeyAtom)!; const user = useAtomValue(userAtom)!;
   const [contacts, setContacts] = useAtom(contactsAtom);
   const [name, setName] = useState(""); const [email, setEmail] = useState(""); const [reveal, setReveal] = useState<number | null>(null);
+  const [err, setErr] = useState<string | null>(null);
 
   // Any change to the contact set changes the k-of-k split, so re-seal if a note exists.
-  const resealIfNeeded = async (next: Contact[]) => {
-    try { const n = await api<any>("/note"); await publishNote(key, user, next, decryptOwnerCopy(key, n)); } catch {}
+  // A failed re-seal leaves contacts holding shares that no longer match: never swallow it.
+  const reseal = async (next: Contact[]) => {
+    const n = await orNull(api<any>("/note"));
+    if (n) await publishNote(key, user, next, decryptOwnerCopy(key, n));
+  };
+  const resealOrWarn = async (next: Contact[], done: string) => {
+    try { await reseal(next); }
+    catch (e: any) { setErr(`${done}, but re-sealing your note failed. Open Last words and re-seal. ${e.message ?? ""}`); }
   };
   const add = async () => {
-    const c = await api<Contact>("/contacts/", { method: "POST", json: { name, email, share_ct: "", share_nonce: "" } });
+    setErr(null);
+    const c = await api<Contact>("/contacts/", { method: "POST", json: { name, email, share_ct: "", share_nonce: "" } })
+      .catch((e: any) => { setErr(`Couldn't add the contact. ${e?.message ?? ""}`); return null; });
+    if (!c) return;
     const next = [...contacts, c]; setContacts(next); setName(""); setEmail(""); setReveal(c.id);
-    await resealIfNeeded(next);
+    await resealOrWarn(next, "Contact added");
   };
   const remove = async (id: number) => {
-    await api(`/contacts/${id}/`, { method: "DELETE" });
-    const next = contacts.filter(c => c.id !== id); setContacts(next); await resealIfNeeded(next);
+    setErr(null);
+    const next = contacts.filter(c => c.id !== id);
+    try {
+      if (next.length === 0 && await orNull(api("/note"))) {
+        return setErr("Your sealed note needs at least one contact. Add another before removing this one.");
+      }
+      await api(`/contacts/${id}/`, { method: "DELETE" });
+    } catch (e: any) { return setErr(`Couldn't remove the contact. ${e.message ?? ""}`); }
+    setContacts(next);
+    await resealOrWarn(next, "Contact removed");
   };
 
   return (
@@ -32,6 +52,7 @@ export default function Contacts() {
         <Input placeholder="name" value={name} onChangeText={setName} autoCapitalize="words" />
         <Input placeholder="email" value={email} onChangeText={setEmail} keyboardType="email-address" />
         <Button title="Add contact" onPress={add} disabled={!name || !email} />
+        <Err e={err} />
       </Card>
       {contacts.map(c => (
         <Card key={c.id}>

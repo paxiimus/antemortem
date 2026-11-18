@@ -24,6 +24,8 @@ class User(AbstractUser):
     tlock_horizon_days = models.PositiveIntegerField(default=540)
     last_checkin = models.DateTimeField(default=timezone.now)
     checkin_token = models.CharField(max_length=64, default=token)  # one-click email check-in
+    nags_sent = models.PositiveSmallIntegerField(default=0)         # overdue reminders sent this lapse
+    contacts_alerted_at = models.DateTimeField(null=True, blank=True)  # contacts asked "has anyone heard from them?"
 
     USERNAME_FIELD = "email"
     REQUIRED_FIELDS = ["username"]
@@ -35,6 +37,7 @@ class User(AbstractUser):
     def check_in(self):
         self.last_checkin = timezone.now()
         self.checkin_token = token()
+        self.nags_sent, self.contacts_alerted_at = 0, None
         if self.status in ("lapsed", "pending"):
             self.status = "alive"
             self.release_events.filter(outcome="").update(outcome="vetoed", resolved_at=timezone.now())

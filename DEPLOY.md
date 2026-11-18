@@ -13,7 +13,7 @@ Keys only ever touch the mobile app. The server stores ciphertext, emails and ti
 
 ## 0. Tools
 
-Docker (with Compose v2), Python 3.12, Node 22, `git`, `make`. For production add `hcloud`, `ssh`, `age` (`age-keygen`), and an Expo account with `eas-cli` for store builds.
+Docker (with Compose v2), Python 3.12, Node 22.13+ or 24.3+, `git`, `make`. For local Android builds: JDK 17 and the Android SDK. For production add `hcloud`, `ssh`, `age` (`age-keygen`), and an Expo account with `eas-cli` for store builds.
 
 ## 1. One-time repo prep (do this first)
 
@@ -26,7 +26,7 @@ The repo ships without two generated artifacts. Without them the image won't bui
 
 # Migrations
 pip install -r backend/requirements.txt
-(cd backend && python manage.py makemigrations core)
+(cd backend && DEBUG=1 python manage.py makemigrations core)
 
 git add -A && git commit -m "Add lockfiles and initial migrations"
 ```
@@ -50,23 +50,27 @@ docker compose exec api python manage.py createsuperuser     # admin at /admin/
 ### Tests
 
 ```bash
-make test        # Django tests (SQLite fallback) + crypto tests incl. TS↔Python Shamir cross-check
+make test        # (runs with DEBUG=1) Django tests (SQLite fallback) + crypto tests incl. TS↔Python Shamir cross-check
 ```
 
 Needs `pip install -r backend/requirements.txt` and `npm install` in `packages/crypto` first.
 
 ### Mobile
 
+Needs Node 22.13+ or 24.3+, and for Android builds JDK 17 plus the Android SDK (Android Studio installs it). The make targets check Node and JDK and say what's wrong.
+
 ```bash
-make setup-mobile             # Expo at the latest SDK, every package resolved by `expo install`
-                              # (make setup-mobile UPGRADE=1 bumps the SDK later)
-cd app
-EXPO_PUBLIC_API_URL=http://<your-LAN-IP>:8000 npx expo start
+make setup-mobile     # installs the app at the pinned SDK (UPGRADE=1 moves to the newest)
+git add app/package.json app/package-lock.json && git commit -m "Pin mobile deps"
+make android          # builds the dev build and installs it on a USB device or emulator
+make mobile           # afterwards: just start Metro for the installed dev build
 ```
 
-- `react-native-libsodium` is a native module, so **Expo Go won't work**. Use a development build: `npx expo run:ios` / `npx expo run:android`, or `eas build --profile development`.
-- Use your LAN IP, not `localhost`, so a phone can reach the API.
-- Universal links need the real domain and don't work locally. To test the contact flow, open the scheme directly with a token from the admin: `npx uri-scheme open antemortem://c/<token> --ios` (or `--android`).
+- **Expo Go won't work.** `react-native-libsodium` is native code that Expo Go doesn't contain, so always use the dev build from `make android`.
+- `make mobile` and `make android` point the app at `http://<this machine's LAN IP>:8000`, because a phone can't reach `localhost`. Override with `MOBILE_API=…`.
+- `app/android/` is generated from `app.json` and gitignored. If a native build fails after a dependency or config change, run `make android-clean` to regenerate it.
+- Commit `app/package.json` and `app/package-lock.json` after every setup: EAS builds install exactly what they list.
+- Universal links need the real domain and don't work locally. To test the contact flow, open the scheme directly with a token from the admin: `npx uri-scheme open antemortem://c/<token> --android`.
 
 ## 3. Production, first deploy
 
@@ -159,7 +163,7 @@ Restore test: download an `.age` file from R2, decrypt it with `age -d -i backup
 
 ## 5. Mobile release
 
-1. `cd app && eas login && eas init`, then `make deploy-mobile` for an Android preview build (`PLATFORM=ios` for iOS). EAS builds use free-tier minutes.
+1. `npm i -g eas-cli && eas login`, then `cd app && eas init --account <your-username>` (your personal account). `make apk` builds an installable preview APK on your machine against the production API; `make deploy-mobile` does the same on EAS's servers (`PLATFORM=ios` for iOS, uses build minutes). Store builds use `--profile production` and need signing set up with `eas credentials`.
 2. Get the iOS Team ID (Apple developer account) and the Android signing-cert SHA-256 (EAS credentials or Play Console → App signing).
 3. On the box, set in `.env`: `IOS_APP_ID=<TeamID>.com.paxiimus.antemortem`, `ANDROID_CERT_FINGERPRINTS=<sha256,…>`, `IOS_URL`, `ANDROID_URL`; then `make restart-hard`.
 4. Verify the link files the stores check:
@@ -180,7 +184,7 @@ Restore test: download an `.age` file from R2, decrypt it with `age -d -i backup
 | Deploy "healthy" but pages 500, or `relation … does not exist` | No migrations committed: section 1, then redeploy |
 | `make health` fails right after first deploy | DNS not pointing yet; Caddy gets the cert on the first request after it does |
 | 400 Bad Request on every call | `ALLOWED_HOSTS` doesn't include the host you're calling |
-| Backend exits with "CORS_ALLOWED_ORIGINS must be set" | Set it in `.env` (non-debug requires it) |
+| `CORS_ALLOWED_ORIGINS must be set in production` | In prod, set it in `.env`. On your own machine the process had no `DEBUG=1`: `settings.py` doesn't read `.env`, so export it or prefix the command (`DEBUG=1 python manage.py …`) |
 | `deploy.sh deploy` says health HTTP 000 | `make logs SVC=backend`; if it's a bad release, `make rollback` |
 | `backup-offsite` fails | `age`/`rclone` missing, no `r2` remote for the deploy user, or `BACKUP_AGE_RECIPIENT` unset |
 | Emails not arriving | Postmark domain not verified, wrong stream name, or `POSTMARK_TOKEN` empty (it only logs) |

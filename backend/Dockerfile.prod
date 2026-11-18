@@ -4,7 +4,7 @@
 FROM node:22-alpine AS crypto
 WORKDIR /crypto
 COPY packages/crypto/package*.json ./
-RUN npm ci --omit=dev --ignore-scripts && npm i --no-save typescript
+RUN npm ci --ignore-scripts        # dev deps too: tsc and @types come from the lockfile, not `latest`
 COPY packages/crypto/ ./
 RUN npx tsc && npm prune --omit=dev
 
