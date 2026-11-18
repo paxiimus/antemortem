@@ -27,10 +27,12 @@ EXPO_MANAGED=(
 PLAIN=(react-native-libsodium @expo-google-fonts/instrument-serif @expo-google-fonts/ibm-plex-mono)
 DEV=(@babel/core @types/react typescript)
 
-# 1. Shared workspace packages first so file: links resolve.
+# 1. Shared packages. Metro bundles both from source (app/metro.config.js). packages/crypto needs its own
+#    node_modules (tlock-js; also the backend's Docker build and the crypto tests). packages/core must NOT
+#    have one: everything it imports is already in the app, and a second copy of jotai would split app state.
 info "Shared packages"
 ( cd ../packages/crypto && npm install )
-( cd ../packages/core   && npm install )
+rm -rf ../packages/core/node_modules
 
 # 2. Restore whatever package.json already lists, then make sure Expo itself is installed.
 #    Checks node_modules, not package.json: a listed-but-missing expo is the case that breaks `expo install`.
@@ -54,9 +56,9 @@ info "Checking compatibility"
 npx expo install --fix
 npx expo-doctor || true
 
-# EAS builds from a clean copy and only installs app/'s dependencies. The shared packages need theirs
-# too (tlock-js lives in packages/crypto/node_modules), so EAS runs this after its own install.
-npm pkg set scripts.eas-build-post-install="cd ../packages/crypto && npm ci --ignore-scripts && cd ../core && npm ci --ignore-scripts"
+# EAS builds from a clean copy and only installs app/'s dependencies. packages/crypto needs its own
+# (tlock-js lives in packages/crypto/node_modules), so EAS runs this after its own install.
+npm pkg set scripts.eas-build-post-install="cd ../packages/crypto && npm ci --ignore-scripts"
 
 # 5. EAS project link. Needs `eas login`; with several accounts, name yours via EAS_ACCOUNT.
 if command -v eas >/dev/null && eas whoami >/dev/null 2>&1; then

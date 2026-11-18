@@ -10,7 +10,7 @@
     "android": "expo run:android",
     "doctor": "npx expo-doctor && npx expo install --check",
     "typecheck": "tsc --noEmit",
-    "eas-build-post-install": "cd ../packages/crypto && npm ci --ignore-scripts && cd ../core && npm ci --ignore-scripts"
+    "eas-build-post-install": "cd ../packages/crypto && npm ci --ignore-scripts"
   },
   "dependencies": {
     "@antemortem/core": "file:../packages/core",

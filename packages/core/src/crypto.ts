@@ -1,28 +1,26 @@
 // Thin adapter over @antemortem/crypto for app flows. All plaintext stays here, in memory.
-import { ready, sodium, deriveVaultKey, encryptEntry, decryptEntry, sealNote, unwrapShare } from "@antemortem/crypto";
+import { ready, sodium, deriveVaultKey, encryptEntry, decryptEntry, sealNote, unwrapShare, b64, unb64, utf8, unutf8 } from "@antemortem/crypto";
 import { api } from "./api.ts";
 import type { Contact, Entry, User } from "./state.ts";
 
 export { ready, deriveVaultKey, encryptEntry, decryptEntry };
 
-const b64 = (u: Uint8Array) => sodium.to_base64(u, sodium.base64_variants.ORIGINAL);
-const unb64 = (s: string) => sodium.from_base64(s, sodium.base64_variants.ORIGINAL);
 
 export const unlock = (passphrase: string, user: User) => deriveVaultKey(passphrase, unb64(user.kdf_salt));
 
 // Each contact's share passphrase is derived from the vault key, so re-sealing never changes
 // what the owner handed them. Show it once per contact; it's theirs to keep offline.
 export const contactPassphrase = (vaultKey: Uint8Array, contactId: number) =>
-  b64(sodium.crypto_generichash(32, sodium.from_string(`contact:${contactId}`), vaultKey));
+  b64(sodium.crypto_generichash(32, utf8(`contact:${contactId}`), vaultKey));
 
 export function encryptOwnerCopy(vaultKey: Uint8Array, text: string) {
   const nonce = sodium.randombytes_buf(24);
-  const ct = sodium.crypto_aead_xchacha20poly1305_ietf_encrypt(sodium.from_string(text), null, null, nonce, vaultKey);
+  const ct = sodium.crypto_aead_xchacha20poly1305_ietf_encrypt(utf8(text), "", null, nonce, vaultKey)   // "" not null: see NO_AD in @antemortem/crypto;
   return { owner_copy_ct: b64(ct), owner_nonce: b64(nonce) };
 }
 
 export function decryptOwnerCopy(vaultKey: Uint8Array, n: { owner_copy_ct: string; owner_nonce: string }) {
-  return sodium.to_string(sodium.crypto_aead_xchacha20poly1305_ietf_decrypt(null, unb64(n.owner_copy_ct), null, unb64(n.owner_nonce), vaultKey));
+  return unutf8(sodium.crypto_aead_xchacha20poly1305_ietf_decrypt(null, unb64(n.owner_copy_ct), "", unb64(n.owner_nonce), vaultKey));
 }
 
 /** Seal (or re-seal) the public note: fresh K, fresh tlock round, fresh k-of-k split; push note + contact shares. */

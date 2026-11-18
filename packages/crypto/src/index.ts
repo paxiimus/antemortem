@@ -1,25 +1,34 @@
 // Vault + note encryption. All plaintext handling happens here, on the client.
 import _sodium from "libsodium-wrappers-sumo";
-import type { ChainClient } from "tlock-js";
+import { timelockEncrypt, timelockDecrypt, roundAt, mainnetClient, type ChainClient } from "tlock-js";
 import { split, combine } from "./shamir.ts";
 
 export let sodium: typeof _sodium;
 export const ready = _sodium.ready.then(() => { sodium = _sodium; });
 
-// tlock-js brings drand and BLS12-381 code that sign-in and unlock never use, so it loads on the
-// first seal or open instead of at app start. One client is reused so drand chain info is cached.
-const tlock = () => import("tlock-js");
-let defaultClient: Promise<ChainClient> | undefined;
-const getClient = (c?: ChainClient) => c ? Promise.resolve(c) : (defaultClient ??= tlock().then(t => t.mainnetClient()));
+// Static import on purpose: a lazy import() of tlock-js fails in Expo dev builds, which serve lazy modules
+// as separate bundles resolved from app/, and tlock-js lives in packages/crypto/node_modules.
+// One client is reused so drand chain info is fetched once, not per seal.
+let defaultClient: ChainClient | undefined;
+const getClient = (c?: ChainClient) => c ?? (defaultClient ??= mainnetClient());
 
-const b64 = (u: Uint8Array) => sodium.to_base64(u, sodium.base64_variants.ORIGINAL);
-const unb64 = (s: string) => sodium.from_base64(s, sodium.base64_variants.ORIGINAL);
+// Encoding helpers that don't go through libsodium: react-native-libsodium implements only part of the
+// libsodium-wrappers API (no from_string, no base64_variants). Same bytes, and the standard padded base64
+// the server decodes. Buffer is Node's built-in, and the app's polyfill on phones.
+export const utf8 = (s: string) => new Uint8Array(Buffer.from(s, "utf8"));
+export const unutf8 = (u: Uint8Array) => Buffer.from(u).toString("utf8");
+export const b64 = (u: Uint8Array) => Buffer.from(u).toString("base64");
+export const unb64 = (s: string) => new Uint8Array(Buffer.from(s, "base64"));
+// Additional data is "" rather than null everywhere: react-native-libsodium only accepts a string there.
+// An empty string is zero bytes of additional data, so ciphertexts are byte-identical to passing null in
+// libsodium-wrappers, Node and the server.
+const NO_AD = "";
 const enc = (pt: Uint8Array, key: Uint8Array) => {
   const nonce = sodium.randombytes_buf(24);
-  return { ct: sodium.crypto_aead_xchacha20poly1305_ietf_encrypt(pt, null, null, nonce, key), nonce };
+  return { ct: sodium.crypto_aead_xchacha20poly1305_ietf_encrypt(pt, NO_AD, null, nonce, key), nonce };
 };
 const dec = (ct: Uint8Array, nonce: Uint8Array, key: Uint8Array) =>
-  sodium.crypto_aead_xchacha20poly1305_ietf_decrypt(null, ct, null, nonce, key);
+  sodium.crypto_aead_xchacha20poly1305_ietf_decrypt(null, ct, NO_AD, nonce, key);
 
 // --- Vault key: Argon2id(passphrase, salt). The same key is the "recovery key" given to contacts.
 // Argon2id, opslimit 3, 256 MiB (libsodium's MODERATE). Written as numbers so it doesn't depend on
@@ -32,19 +41,19 @@ export function deriveVaultKey(passphrase: string, salt: Uint8Array): Uint8Array
 // An entry has one stored nonce but up to three ciphertexts, so each field gets its own subkey:
 // no (key, nonce) pair is ever used twice. Fields also can't be swapped for one another.
 type Field = "title" | "body" | "blob";
-const fieldKey = (key: Uint8Array, f: Field) => sodium.crypto_generichash(32, sodium.from_string(`antemortem/vault/${f}`), key);
+const fieldKey = (key: Uint8Array, f: Field) => sodium.crypto_generichash(32, utf8(`antemortem/vault/${f}`), key);
 
 export function encryptEntry(key: Uint8Array, title: string, body: string, blob?: Uint8Array) {
   const nonce = sodium.randombytes_buf(24);
-  const e = (f: Field, pt: Uint8Array) => b64(sodium.crypto_aead_xchacha20poly1305_ietf_encrypt(pt, null, null, nonce, fieldKey(key, f)));
-  return { title_ct: e("title", sodium.from_string(title)), body_ct: e("body", sodium.from_string(body)),
+  const e = (f: Field, pt: Uint8Array) => b64(sodium.crypto_aead_xchacha20poly1305_ietf_encrypt(pt, NO_AD, null, nonce, fieldKey(key, f)));
+  return { title_ct: e("title", utf8(title)), body_ct: e("body", utf8(body)),
            blob_ct: blob ? e("blob", blob) : null, nonce: b64(nonce) };
 }
 
 export function decryptEntry(key: Uint8Array, e: { title_ct: string; body_ct: string; nonce: string }) {
   const nonce = unb64(e.nonce);
-  return { title: sodium.to_string(dec(unb64(e.title_ct), nonce, fieldKey(key, "title"))),
-           body: sodium.to_string(dec(unb64(e.body_ct), nonce, fieldKey(key, "body"))) };
+  return { title: unutf8(dec(unb64(e.title_ct), nonce, fieldKey(key, "title"))),
+           body: unutf8(dec(unb64(e.body_ct), nonce, fieldKey(key, "body"))) };
 }
 
 // --- Public note: random key K. Body under K. K is (a) tlocked to a drand round and
@@ -52,12 +61,12 @@ export function decryptEntry(key: Uint8Array, e: { title_ct: string; body_ct: st
 export async function sealNote(opts: {
   text: string; contactPassphrases: string[]; horizonDays: number; client?: ChainClient;
 }) {
-  const [t, client] = await Promise.all([tlock(), getClient(opts.client)]);
+  const client = getClient(opts.client);
   const info = await client.chain().info();
   const key = sodium.randombytes_buf(32);
-  const { ct, nonce } = enc(sodium.from_string(opts.text), key);
-  const round = t.roundAt(Date.now() + opts.horizonDays * 86_400_000, info);
-  const tlocked = await t.timelockEncrypt(round, Buffer.from(key), client);
+  const { ct, nonce } = enc(utf8(opts.text), key);
+  const round = roundAt(Date.now() + opts.horizonDays * 86_400_000, info);
+  const tlocked = await timelockEncrypt(round, Buffer.from(key), client);
 
   const n = opts.contactPassphrases.length;
   if (n < 1) throw new Error("at least one contact");
@@ -66,7 +75,7 @@ export async function sealNote(opts: {
   key.fill(0);
   return {
     body_ct: b64(ct), nonce: b64(nonce),
-    tlock_wrapped_key: b64(sodium.from_string(tlocked)), tlock_round: round,
+    tlock_wrapped_key: b64(utf8(tlocked)), tlock_round: round,
     tlock_chain: info.hash,
     shamir_threshold: n, contactShares,
   };
@@ -76,7 +85,7 @@ export async function sealNote(opts: {
 // 256 bits of key material (core/contactPassphrase), not something a person chose, so a fast keyed
 // hash is enough. Argon2id here cost 256 MiB per contact on every seal. Never feed it a human passphrase.
 const shareKey = (passphrase: string, salt: Uint8Array) => {
-  const tag = sodium.from_string("antemortem/share"), pw = sodium.from_string(passphrase);
+  const tag = utf8("antemortem/share"), pw = utf8(passphrase);
   const m = new Uint8Array(tag.length + salt.length + pw.length);
   m.set(tag); m.set(salt, tag.length); m.set(pw, tag.length + salt.length);
   return sodium.crypto_generichash(32, m);
@@ -97,12 +106,11 @@ export function unwrapShare(share_ct: string, share_nonce: string, passphrase: s
 }
 
 export async function openNoteByTlock(tlock_wrapped_key: string, body_ct: string, nonce: string, client?: ChainClient) {
-  const [t, c] = await Promise.all([tlock(), getClient(client)]);
-  const key = await t.timelockDecrypt(sodium.to_string(unb64(tlock_wrapped_key)), c);
-  return sodium.to_string(dec(unb64(body_ct), unb64(nonce), new Uint8Array(key)));
+  const key = await timelockDecrypt(unutf8(unb64(tlock_wrapped_key)), getClient(client));
+  return unutf8(dec(unb64(body_ct), unb64(nonce), new Uint8Array(key)));
 }
 
 export function openNoteByShares(shares: string[], body_ct: string, nonce: string) {
   const key = shares.length === 1 ? unb64(shares[0]) : combine(shares.map(unb64));
-  return sodium.to_string(dec(unb64(body_ct), unb64(nonce), key));
+  return unutf8(dec(unb64(body_ct), unb64(nonce), key));
 }

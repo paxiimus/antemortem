@@ -41,8 +41,8 @@ MOBILE_API ?= http://$(LAN_IP):8000
 
 setup-mobile:  ## Install/realign the Expo app (UPGRADE=1 moves to the newest SDK)
 	./scripts/setup-mobile.sh $(if $(UPGRADE),--upgrade,)
-mobile:  ## Metro for an installed dev build, API on this machine (MOBILE_API= to override)
-	cd app && EXPO_PUBLIC_API_URL=$(MOBILE_API) npx expo start --dev-client
+mobile:  ## Metro for an installed dev build, API on this machine (MOBILE_API=, CLEAR=1 empties Metro's cache)
+	cd app && EXPO_PUBLIC_API_URL=$(MOBILE_API) npx expo start --dev-client $(if $(CLEAR),--clear,)
 android: check-jdk  ## Build + install the dev build on a USB device or emulator
 	cd app && EXPO_PUBLIC_API_URL=$(MOBILE_API) npx expo run:android
 android-clean: check-jdk  ## Same, after regenerating app/android from app.json
