@@ -21,10 +21,10 @@ EXPO_MANAGED=(
   expo expo-router expo-constants expo-linking expo-status-bar expo-secure-store
   expo-splash-screen expo-system-ui expo-font expo-dev-client
   react react-dom react-native react-native-safe-area-context react-native-screens
-  react-native-get-random-values
+  react-native-get-random-values react-native-svg expo-haptics expo-clipboard @expo/vector-icons
 )
 # Native libs not in Expo's compatibility table — installed plainly.
-PLAIN=(react-native-libsodium)
+PLAIN=(react-native-libsodium @expo-google-fonts/instrument-serif @expo-google-fonts/ibm-plex-mono)
 DEV=(@babel/core @types/react typescript)
 
 # 1. Shared workspace packages first so file: links resolve.

@@ -1,25 +1,31 @@
-import "react-native-get-random-values";
-import "@/platform";
-import { Buffer } from "buffer";
-globalThis.Buffer ??= Buffer;   // tlock-js expects Node's Buffer
+import "@/polyfills";   // first, before anything that loads @antemortem/core
 
 import { useEffect, useState } from "react";
-import { Slot, useRouter, useSegments } from "expo-router";
-import { Provider, useAtom, useAtomValue } from "jotai";
+import { Stack } from "expo-router";
+import * as SplashScreen from "expo-splash-screen";
+import { useFonts } from "expo-font";
+import { InstrumentSerif_400Regular, InstrumentSerif_400Regular_Italic } from "@expo-google-fonts/instrument-serif";
+import { IBMPlexMono_400Regular, IBMPlexMono_500Medium } from "@expo-google-fonts/ibm-plex-mono";
+import { Provider, useAtom, useAtomValue, useSetAtom } from "jotai";
 import { StatusBar } from "expo-status-bar";
-import { ActivityIndicator, View } from "react-native";
-import { api, ApiError, setToken } from "@antemortem/core";
+import { api, ApiError, ready, setToken, tokenAtom, userAtom, vaultKeyAtom, type User } from "@antemortem/core";
 import { tokenStore } from "@/platform";
-import { ready } from "@antemortem/core";
-import { tokenAtom, userAtom, vaultKeyAtom, type User } from "@antemortem/core";
-import { Button, C, P, Screen } from "@/ui";
+import { Button, C, F, P, Screen, Title } from "@/ui";
 
-function Gate() {
+SplashScreen.preventAutoHideAsync().catch(() => {});
+
+// Access control is declarative (Stack.Protected). Redirecting with router.replace() from an effect
+// can fire before the navigator mounts, which drops the redirect and leaves an empty screen.
+function RootNavigator() {
   const [token, setTok] = useAtom(tokenAtom);
-  const [, setUser] = useAtom(userAtom);
+  const setUser = useSetAtom(userAtom);
   const key = useAtomValue(vaultKeyAtom);
   const [booted, setBooted] = useState(false); const [bootErr, setBootErr] = useState<string | null>(null);
-  const segments = useSegments(); const router = useRouter();
+  const [fontsLoaded, fontErr] = useFonts({
+    [F.display]: InstrumentSerif_400Regular, [F.displayItalic]: InstrumentSerif_400Regular_Italic,
+    [F.mono]: IBMPlexMono_400Regular, [F.monoMed]: IBMPlexMono_500Medium,
+  });
+  const fontsDone = fontsLoaded || !!fontErr;   // a failed font falls back to the system face
 
   // Only a 401/403 means the token is bad. Anything else (no signal, server down) keeps it and offers a retry.
   const boot = async () => {
@@ -39,21 +45,37 @@ function Gate() {
     } catch (e: any) { setBootErr(e?.message ?? String(e)); }
   };
   useEffect(() => { boot(); }, []);
+  useEffect(() => { if ((booted || bootErr) && fontsDone) SplashScreen.hideAsync().catch(() => {}); }, [booted, bootErr, fontsDone]);
 
-  useEffect(() => {
-    if (!booted) return;
-    const inAuth = segments[0] === "(auth)";
-    if (segments[0] === "c") return;                       // contact flow needs no account
-    if (!token && !inAuth) router.replace("/(auth)/login");
-    else if (token && !key && segments[0] !== "unlock") router.replace("/unlock");
-    else if (token && key && (inAuth || segments[0] === "unlock")) router.replace("/(tabs)");
-  }, [booted, token, key, segments[0]]);
+  if (!fontsDone) return null;   // the splash screen is still showing
+  if (bootErr) return (
+    <Screen>
+      <Title>Can't reach the server.</Title>
+      <P dim>Your vault is safe on this phone; nothing was lost. Check your connection and try again.</P>
+      <P small dim>{bootErr}</P>
+      <Button title="Retry" onPress={boot} />
+    </Screen>
+  );
+  if (!booted) return null;
 
-  if (bootErr) return <Screen><P>Can't reach Ante Mortem right now.</P><P dim>{bootErr}</P><Button title="Retry" onPress={boot} /></Screen>;
-  if (!booted) return <View style={{ flex: 1, backgroundColor: C.bg, justifyContent: "center" }}><ActivityIndicator color={C.accent} /></View>;
-  return <Slot />;
+  const signedIn = !!token, unlocked = signedIn && !!key;
+  return (
+    <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: C.bg }, animation: "fade" }}>
+      <Stack.Protected guard={!signedIn}>
+        <Stack.Screen name="(auth)/login" />
+        <Stack.Screen name="(auth)/register" />
+      </Stack.Protected>
+      <Stack.Protected guard={signedIn && !unlocked}>
+        <Stack.Screen name="unlock" />
+      </Stack.Protected>
+      <Stack.Protected guard={unlocked}>
+        <Stack.Screen name="(tabs)" />
+      </Stack.Protected>
+      <Stack.Screen name="c/[token]" />{/* contact flow: no account needed */}
+    </Stack>
+  );
 }
 
 export default function Root() {
-  return <Provider><StatusBar style="light" /><Gate /></Provider>;
+  return <Provider><StatusBar style="light" /><RootNavigator /></Provider>;
 }

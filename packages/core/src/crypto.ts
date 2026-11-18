@@ -49,7 +49,8 @@ export type ContactView = {
 export const fetchContactView = (token: string) => api<ContactView>(`/c/${token}`);
 
 export async function attestDeath(token: string, view: ContactView, sharePassphrase: string) {
-  const share = unwrapShare(view.contact.share_ct, view.contact.share_nonce, sharePassphrase); // throws on wrong passphrase
+  const pass = sharePassphrase.replace(/\s+/g, "");   // shown grouped in fours; base64 never contains spaces
+  const share = unwrapShare(view.contact.share_ct, view.contact.share_nonce, pass); // throws on wrong passphrase
   return api<{ attested_at: string; owner_status: User["status"] }>(`/c/${token}/attest`, { method: "POST", json: { share } });
 }
 

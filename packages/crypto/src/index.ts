@@ -1,10 +1,16 @@
 // Vault + note encryption. All plaintext handling happens here, on the client.
 import _sodium from "libsodium-wrappers-sumo";
-import { timelockEncrypt, timelockDecrypt, roundAt, mainnetClient, type ChainClient } from "tlock-js";
+import type { ChainClient } from "tlock-js";
 import { split, combine } from "./shamir.ts";
 
 export let sodium: typeof _sodium;
 export const ready = _sodium.ready.then(() => { sodium = _sodium; });
+
+// tlock-js brings drand and BLS12-381 code that sign-in and unlock never use, so it loads on the
+// first seal or open instead of at app start. One client is reused so drand chain info is cached.
+const tlock = () => import("tlock-js");
+let defaultClient: Promise<ChainClient> | undefined;
+const getClient = (c?: ChainClient) => c ? Promise.resolve(c) : (defaultClient ??= tlock().then(t => t.mainnetClient()));
 
 const b64 = (u: Uint8Array) => sodium.to_base64(u, sodium.base64_variants.ORIGINAL);
 const unb64 = (s: string) => sodium.from_base64(s, sodium.base64_variants.ORIGINAL);
@@ -46,11 +52,12 @@ export function decryptEntry(key: Uint8Array, e: { title_ct: string; body_ct: st
 export async function sealNote(opts: {
   text: string; contactPassphrases: string[]; horizonDays: number; client?: ChainClient;
 }) {
-  const client = opts.client ?? mainnetClient();
+  const [t, client] = await Promise.all([tlock(), getClient(opts.client)]);
+  const info = await client.chain().info();
   const key = sodium.randombytes_buf(32);
   const { ct, nonce } = enc(sodium.from_string(opts.text), key);
-  const round = roundAt(Date.now() + opts.horizonDays * 86_400_000, await client.chain().info());
-  const tlocked = await timelockEncrypt(round, Buffer.from(key), client);
+  const round = t.roundAt(Date.now() + opts.horizonDays * 86_400_000, info);
+  const tlocked = await t.timelockEncrypt(round, Buffer.from(key), client);
 
   const n = opts.contactPassphrases.length;
   if (n < 1) throw new Error("at least one contact");
@@ -60,7 +67,7 @@ export async function sealNote(opts: {
   return {
     body_ct: b64(ct), nonce: b64(nonce),
     tlock_wrapped_key: b64(sodium.from_string(tlocked)), tlock_round: round,
-    tlock_chain: (await client.chain().info()).hash,
+    tlock_chain: info.hash,
     shamir_threshold: n, contactShares,
   };
 }
@@ -89,8 +96,9 @@ export function unwrapShare(share_ct: string, share_nonce: string, passphrase: s
   return b64(dec(buf.slice(16), unb64(share_nonce), k));
 }
 
-export async function openNoteByTlock(tlock_wrapped_key: string, body_ct: string, nonce: string, client = mainnetClient()) {
-  const key = await timelockDecrypt(sodium.to_string(unb64(tlock_wrapped_key)), client);
+export async function openNoteByTlock(tlock_wrapped_key: string, body_ct: string, nonce: string, client?: ChainClient) {
+  const [t, c] = await Promise.all([tlock(), getClient(client)]);
+  const key = await t.timelockDecrypt(sodium.to_string(unb64(tlock_wrapped_key)), c);
   return sodium.to_string(dec(unb64(body_ct), unb64(nonce), new Uint8Array(key)));
 }
 
